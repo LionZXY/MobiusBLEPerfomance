@@ -93,22 +93,9 @@ class MobiusBLEManager(
         }
     }
 
-    fun startTxBenchmark(scope: CoroutineScope) {
+    suspend fun startTxBenchmark(scope: CoroutineScope) {
         val txChar = characteristics[Constants.BLESerialService.TX]!!
-
-        val bytes = ByteArrayGenerator.generate()
-        writeCharacteristic(txChar, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-            .done {
-                Log.i(TAG, "Done")
-            }
-            .enqueue()
-        writeCharacteristic(
-            txChar,
-            ByteArrayGenerator.generate(),
-            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        ).await()
-        Log.i(TAG, "Done await")
-
+        sendBytes(txChar, scope)
     }
 
     private suspend fun sendBytes(
