@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext
 import no.nordicsemi.android.ble.BleManager
 import no.nordicsemi.android.ble.ConnectionPriorityRequest
 import no.nordicsemi.android.ble.annotation.WriteType
+import no.nordicsemi.android.ble.ktx.getCharacteristic
 import no.nordicsemi.android.ble.ktx.splitWithProgressFlow
 import no.nordicsemi.android.ble.ktx.state.ConnectionState
 import no.nordicsemi.android.ble.ktx.stateAsFlow
@@ -28,7 +29,9 @@ class MobiusBLEManager(
     context: Context,
     scope: CoroutineScope
 ) : BleManager(context) {
-    private val characteristics: MutableMap<UUID, BluetoothGattCharacteristic> = mutableMapOf()
+    private var txChar: BluetoothGattCharacteristic? = null
+    private var rxChar: BluetoothGattCharacteristic? = null
+    private var rxStartChar: BluetoothGattCharacteristic? = null
     val txSpeedMeter = SpeedMeter(scope)
     val rxSpeedMeter = SpeedMeter(scope)
 
@@ -46,9 +49,13 @@ class MobiusBLEManager(
         gatt.services.forEach { service ->
             service.characteristics.forEach {
                 Log.d(TAG, "Characteristic for service ${service.uuid}: ${it.uuid}")
-                characteristics[it.uuid] = it
             }
         }
+
+        val service = gatt.getService(Constants.BLESerialService.SERVICE_UUID)
+        txChar = service.getCharacteristic(Constants.BLESerialService.TX)
+        rxChar = service.getCharacteristic(Constants.BLESerialService.RX)
+        rxStartChar = service.getCharacteristic(Constants.BLESerialService.START_BRUTEFORCE)
         return true
     }
 
@@ -61,8 +68,6 @@ class MobiusBLEManager(
             ConnectionPriorityRequest.CONNECTION_PRIORITY_HIGH
         ).enqueue()
 
-        val rxChar = characteristics[Constants.BLESerialService.RX]
-
         setNotificationCallback(rxChar).with { _, data ->
             rxSpeedMeter.onReceiveBytes(data.size())
         }
@@ -71,7 +76,6 @@ class MobiusBLEManager(
 
 
     suspend fun startRxBenchmark(benchScope: CoroutineScope) {
-        val rxStartChar = characteristics[Constants.BLESerialService.START_BRUTEFORCE]
         writeCharacteristic(
             rxStartChar,
             byteArrayOf(1),
@@ -94,12 +98,10 @@ class MobiusBLEManager(
     }
 
     suspend fun startTxBenchmark(scope: CoroutineScope) {
-        val txChar = characteristics[Constants.BLESerialService.TX]!!
-        sendBytes(txChar, scope)
+        sendBytes(scope)
     }
 
     private suspend fun sendBytes(
-        txChar: BluetoothGattCharacteristic,
         scope: CoroutineScope
     ): Unit = withContext(Dispatchers.Main) {
         val bytes = ByteArrayGenerator.generate()
@@ -108,7 +110,7 @@ class MobiusBLEManager(
                 txSpeedMeter.onReceiveBytes(bytes.size)
                 if (scope.isActive) {
                     scope.launch {
-                        sendBytes(txChar, scope)
+                        sendBytes(scope)
                     }
                 }
             }
