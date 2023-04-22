@@ -8,6 +8,7 @@ import com.lionzxy.mobiusbleperfomance.ble.device.MobiusBLEManager
 import com.lionzxy.mobiusbleperfomance.ble.scanner.MobiusBLEScannerImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ class DeviceViewModel(
         job = viewModelScope.launch(Dispatchers.Default) {
             deviceScreenStateFlow.emit(DeviceScreenState.StartedBenchmark)
             bleManager.startTxBenchmark(this)
+            awaitCancellation()
         }
     }
 
@@ -51,6 +53,7 @@ class DeviceViewModel(
         job = viewModelScope.launch {
             deviceScreenStateFlow.emit(DeviceScreenState.StartedBenchmark)
             bleManager.startRxBenchmark(this)
+            awaitCancellation()
         }
     }
 

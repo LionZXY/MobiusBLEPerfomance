@@ -16,7 +16,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.nordicsemi.android.ble.BleManager
 import no.nordicsemi.android.ble.ConnectionPriorityRequest
+import no.nordicsemi.android.ble.PhyRequest
 import no.nordicsemi.android.ble.annotation.WriteType
+import no.nordicsemi.android.ble.callback.WriteProgressCallback
 import no.nordicsemi.android.ble.ktx.getCharacteristic
 import no.nordicsemi.android.ble.ktx.splitWithProgressFlow
 import no.nordicsemi.android.ble.ktx.state.ConnectionState
@@ -68,6 +70,12 @@ class MobiusBLEManager(
             ConnectionPriorityRequest.CONNECTION_PRIORITY_HIGH
         ).enqueue()
 
+        setPreferredPhy(
+            PhyRequest.PHY_LE_2M_MASK,
+            PhyRequest.PHY_LE_2M_MASK,
+            PhyRequest.PHY_OPTION_NO_PREFERRED
+        ).enqueue()
+
         setNotificationCallback(rxChar).with { _, data ->
             rxSpeedMeter.onReceiveBytes(data.size())
         }
@@ -97,24 +105,31 @@ class MobiusBLEManager(
         }
     }
 
-    suspend fun startTxBenchmark(scope: CoroutineScope) {
+    fun startTxBenchmark(scope: CoroutineScope) {
         sendBytes(scope)
     }
 
-    private suspend fun sendBytes(
+    private fun sendBytes(
         scope: CoroutineScope
-    ): Unit = withContext(Dispatchers.Main) {
+    ) {
         val bytes = ByteArrayGenerator.generate()
         writeCharacteristic(txChar, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            .split(WriteProgressCallback { device, data, index ->
+                if (data != null) {
+                    txSpeedMeter.onReceiveBytes(data.size)
+                }
+            })
             .done {
-                txSpeedMeter.onReceiveBytes(bytes.size)
+                Log.i(TAG, "Bytes send!")
                 if (scope.isActive) {
-                    scope.launch {
-                        sendBytes(scope)
-                    }
+                    sendBytes(scope)
                 }
             }
+            .fail { device, status ->
+                Log.i(TAG, "Fail send request with $status")
+            }
             .enqueue()
+        Log.i(TAG, "Schedule bytes to send...")
     }
 
 

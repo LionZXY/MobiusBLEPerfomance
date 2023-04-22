@@ -3,7 +3,7 @@ package com.lionzxy.mobiusbleperfomance.ble.device
 import java.util.UUID
 
 object Constants {
-    const val PACKET_SIZE = 20
+    const val PACKET_SIZE = 30000
     const val MTU = 414
 
     // BLE serial service uuids: service uuid and characteristics uuids
