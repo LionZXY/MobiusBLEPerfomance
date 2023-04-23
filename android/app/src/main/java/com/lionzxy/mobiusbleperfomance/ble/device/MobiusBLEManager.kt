@@ -63,6 +63,7 @@ class MobiusBLEManager(
 
     override fun onDeviceReady() {
         // Set up MTU
+        /*
         requestMtu(Constants.MTU)
             .enqueue()
 
@@ -74,7 +75,7 @@ class MobiusBLEManager(
             PhyRequest.PHY_LE_2M_MASK,
             PhyRequest.PHY_LE_2M_MASK,
             PhyRequest.PHY_OPTION_NO_PREFERRED
-        ).enqueue()
+        ).enqueue()*/
 
         setNotificationCallback(rxChar).with { _, data ->
             rxSpeedMeter.onReceiveBytes(data.size())
@@ -88,13 +89,17 @@ class MobiusBLEManager(
             rxStartChar,
             byteArrayOf(1),
             BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        ).enqueue()
+        ).fail { device, status ->
+            Log.i(TAG, "Failed write char $status")
+        }.done {
+            Log.i(TAG, "Sucs write char")
+        }.enqueue()
 
         benchScope.launch {
             try {
                 awaitCancellation()
             } finally {
-                withContext(NonCancellable) {
+                withContext(NonCancellable + Dispatchers.Default) {
                     writeCharacteristic(
                         rxStartChar,
                         byteArrayOf(0),
